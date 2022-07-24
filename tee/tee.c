@@ -5,8 +5,6 @@
 #include <string.h>
 #include <error_handler.h>
 
-#define MEMORY_ALLOC_ERR -1
-
 struct t_file {
     char*   filename;
     int     fd;
@@ -129,7 +127,7 @@ int main(int argc, char** argv) {
                 S_IROTH | S_IWOTH;
     check(open_files(&files, open_flags, open_rights));
     /*read input and wite to files and*/
-    process_input(&files);
+    check(process_input(&files));
     /* close files, free everything */
     free_all(&files, options);
     exit(EXIT_SUCCESS);
