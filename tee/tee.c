@@ -26,7 +26,7 @@ static int open_files(s_file* files, int open_flags, int open_rights, int files_
 }
 
 static int contain_opt(char* options, char opt) {
-    for(int i = 0; i < strlen(options); ++i) {
+    for(int i = 0; i < (int)strlen(options); ++i) {
         if(options[i] == opt) {
             return 0;
         }
@@ -139,5 +139,6 @@ int main(int argc, char** argv) {
     /*read input and wite to files and*/
     process_input(files, files_count);
     /* close files, free everything */
+    free_all(files, options, files_count);
     exit(EXIT_SUCCESS);
 }
