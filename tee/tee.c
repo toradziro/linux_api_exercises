@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <error_handler.h>
 
 #define MEMORY_ALLOC_ERR -1
 
@@ -11,18 +12,24 @@ struct t_file {
     int     fd;
 };
 
-typedef struct t_file s_file;
+struct t_files {
+    struct t_file*  files_arr;
+    int             files_count;
+};
 
-static int open_files(s_file* files, int open_flags, int open_rights, int files_count) {
+typedef struct t_file s_file;
+typedef struct t_files s_files;
+
+static e_error open_files(s_files* files, int open_flags, int open_rights) {
     int fd;
-    for(int i = 0; i < files_count; ++i) {
-        fd = open(files[i].filename, open_flags, open_rights);
+    for(int i = 0; i < files->files_count; ++i) {
+        fd = open(files->files_arr[i].filename, open_flags, open_rights);
         if(fd == -1) {
-            return -1;
+            return EE_OPEN_ERROR;
         }
-        files[i].fd = fd;
+        files->files_arr[i].fd = fd;
     }
-    return 0;
+    return EE_SUCCESS;
 }
 
 static int contain_opt(char* options, char opt) {
@@ -34,11 +41,11 @@ static int contain_opt(char* options, char opt) {
     return -1;
 }
 
-static int add_option(char** options, char new_opt) {
+static e_error add_option(char** options, char new_opt) {
     int old_len = strlen(*options);
     char* new_opts = calloc(sizeof(char), old_len + 2);
     if(new_opts == NULL) {
-        return MEMORY_ALLOC_ERR;
+        return EE_MEMORY_ERROR;
     }
     for(int i = 0; i < old_len; ++i) {
         new_opts[i] = (*options)[i];
@@ -46,80 +53,68 @@ static int add_option(char** options, char new_opt) {
     new_opts[old_len] = new_opt;
     free(*options);
     *options = new_opts;
-    return 0;
+    return EE_SUCCESS;
 }
 
-static int parse_args(int argc, char** argv, s_file** files, char** options) {
+static e_error parse_args(int argc, char** argv, s_files* files, char** options) {
     *options = calloc(sizeof(char), 1);
-    *files = calloc(sizeof(s_file), argc - 1);
-    int file_counter = 0;
+    files->files_arr = calloc(sizeof(s_file), argc - 1);
     if(options == NULL || files == NULL) {
-        return MEMORY_ALLOC_ERR;
+        return EE_MEMORY_ERROR;
     }
     for(int i = 1; i < argc; ++i) {
         // treat as option
         if(argv[i][0] == '-') {
-            if(add_option(options, argv[i][1]) == -1) {
-                return MEMORY_ALLOC_ERR;
-            }
+            check(add_option(options, argv[i][1]));
         } else {
             // treat as filename
-            (*files)[file_counter].filename = argv[i];
-            ++file_counter;
+            files->files_arr[files->files_count].filename = argv[i];
+            ++files->files_count;
         }
     }
-    return file_counter;
+    return EE_SUCCESS;
 }
 
-static int process_input(s_file* files, int files_count) {
+static e_error process_input(s_files* files) {
     char* buf = NULL;
     int was_read = 0;
     size_t n;
     while((was_read = getline(&buf, &n, stdin)) != -1) {
-        for(int i = 0; i < files_count; ++i) {
-            if(write(files[i].fd, buf, was_read) != was_read) {
-                return -1;
+        for(int i = 0; i < files->files_count; ++i) {
+            if(write(files->files_arr[i].fd, buf, was_read) != was_read) {
+                return EE_WRITE_ERROR;
             }
         }
         if(write(STDOUT_FILENO, buf, was_read) != was_read) {
-            return -1;
+            return EE_WRITE_ERROR;
         }
         free(buf);
         buf = NULL;
     }
-    if(buf != NULL) {
-        free(buf);
-    }
-    return 0;
+    free(buf);
+    return EE_SUCCESS;
 }
 
-static void free_all(s_file* files, char* options, int files_count) {
-    for(int i = 0; i < files_count; ++i) {
-        close(files[i].fd);
+static void free_all(s_files* files, char* options) {
+    for(int i = 0; i < files->files_count; ++i) {
+        close(files->files_arr[i].fd);
     }
-    free(files);
+    free(files->files_arr);
     free(options);
 }
 
 int main(int argc, char** argv) {
-#pragma message("TODO: Add common error-handling mechanism")
-#pragma message("TODO: Add makefile")
 #pragma message("TODO: Add tests")
-#pragma message("TODO: Add file array wrapper")
     if(argc < 2) {
         printf("Usage: %s filename\noptional args:\n-a append to the end of file\n", argv[0]);
         exit(EXIT_FAILURE);
     }
     char* options = NULL;
-    s_file* files = NULL;
     int open_flags = 0;
     int open_rights = 0;
-    int files_count = 0;
+    s_files files = {NULL, 0};
     /* creating arrays of files and of options */
-    files_count = parse_args(argc, argv, &files, &options);
-    if(files_count <= 0) {
-        exit(EXIT_FAILURE);
-    }
+    check(parse_args(argc, argv, &files, &options));
     /* default flags for any file */
     open_flags = O_CREAT | O_WRONLY;
     /* check if we have to truncate or append strigs to files */
@@ -132,13 +127,10 @@ int main(int argc, char** argv) {
     open_rights = S_IRUSR | S_IWUSR |
                 S_IRGRP | S_IWGRP |
                 S_IROTH | S_IWOTH;
-    if(open_files(files, open_flags, open_rights, files_count) != 0) {
-        printf("Files open error\n");
-        exit(EXIT_FAILURE);
-    }
+    check(open_files(&files, open_flags, open_rights));
     /*read input and wite to files and*/
-    process_input(files, files_count);
+    process_input(&files);
     /* close files, free everything */
-    free_all(files, options, files_count);
+    free_all(&files, options);
     exit(EXIT_SUCCESS);
 }

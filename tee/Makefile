@@ -1,6 +1,7 @@
 NAME = tee
 
 SRCS =	tee.c \
+		../error_handler/error_handler.c \
 
 INC_DIRS =	-I../error_handler \
 
