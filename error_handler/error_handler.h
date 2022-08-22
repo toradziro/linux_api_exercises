@@ -8,7 +8,8 @@ enum e_error {
     EE_MEMORY_ERROR,
     EE_OPEN_ERROR,
     EE_READ_ERROR,
-    EE_WRITE_ERROR
+    EE_WRITE_ERROR,
+    EE_LSEEK_ERROR
 };
 
 typedef enum e_error e_error;

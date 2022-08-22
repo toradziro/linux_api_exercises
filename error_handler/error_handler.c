@@ -32,6 +32,10 @@ void check(e_error error_code)
             print_error_exit("Error: write call failed\n");
             break;
 
+        case EE_LSEEK_ERROR:
+            print_error_exit("Error: lseek call failed\n");
+            break;
+
         default:
             break;
     }
